@@ -1,0 +1,88 @@
+{
+  "plants": [
+    {
+      "id": "blueberry",
+      "name_zh": "蓝莓",
+      "name_en": "Blueberry",
+      "emoji": "🫐",
+      "moisture_thresholds": {
+        "critical_low": 25,
+        "target_low": 40,
+        "target_high": 65,
+        "critical_high": 80
+      },
+      "watering": {
+        "strategy": "keep_moist",
+        "base_duration_seconds": 15,
+        "min_interval_hours": 1,
+        "notes": "蓝莓喜欢持续湿润的酸性土壤，不耐干旱。果期需水量最大，冬季休眠期减少浇水。"
+      },
+      "seasonal_multipliers": {
+        "spring": 1.2,
+        "summer": 1.5,
+        "autumn": 0.8,
+        "winter": 0.3
+      },
+      "sensitivity": {
+        "drought": "high",
+        "overwater": "medium"
+      }
+    },
+    {
+      "id": "rhododendron",
+      "name_zh": "映山红",
+      "name_en": "Rhododendron",
+      "emoji": "🌸",
+      "moisture_thresholds": {
+        "critical_low": 20,
+        "target_low": 35,
+        "target_high": 55,
+        "critical_high": 65
+      },
+      "watering": {
+        "strategy": "dry_between",
+        "base_duration_seconds": 10,
+        "min_interval_hours": 2,
+        "notes": "映山红极怕积水，根系易腐烂。两次浇水间需让表层土略干。花后大幅减少浇水。使用软水或雨水为佳。"
+      },
+      "seasonal_multipliers": {
+        "spring": 1.3,
+        "summer": 1.1,
+        "autumn": 0.6,
+        "winter": 0.2
+      },
+      "sensitivity": {
+        "drought": "medium",
+        "overwater": "very_high"
+      }
+    },
+    {
+      "id": "general",
+      "name_zh": "普通花卉",
+      "name_en": "General Flower",
+      "emoji": "🌿",
+      "moisture_thresholds": {
+        "critical_low": 20,
+        "target_low": 35,
+        "target_high": 60,
+        "critical_high": 75
+      },
+      "watering": {
+        "strategy": "standard",
+        "base_duration_seconds": 12,
+        "min_interval_hours": 1,
+        "notes": "通用模板，适合大多数普通花卉和绿植。"
+      },
+      "seasonal_multipliers": {
+        "spring": 1.1,
+        "summer": 1.3,
+        "autumn": 0.8,
+        "winter": 0.4
+      },
+      "sensitivity": {
+        "drought": "medium",
+        "overwater": "medium"
+      }
+    }
+  ]
+}
