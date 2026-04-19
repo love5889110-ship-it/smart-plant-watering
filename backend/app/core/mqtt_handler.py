@@ -5,7 +5,6 @@ from datetime import datetime
 
 from ..database import SessionLocal, SensorReading, WateringEvent, PlantInstance
 from .decision_engine import decide
-from .plant_knowledge import get_profile
 
 _mqtt_client: mqtt.Client | None = None
 
@@ -52,30 +51,54 @@ def _handle_sensor(client: mqtt.Client, data: dict):
         )
         db.add(reading)
 
-        # 决策引擎判断是否浇水
-        profile = get_profile(plant.profile_id)
-        min_interval = profile["watering"]["min_interval_hours"] if profile else 1
-        decision = decide(plant.profile_id, moisture, plant.last_watered_at, min_interval)
+        # 决策引擎判断是否浇水（仅自动浇水启用时）
+        if not plant.auto_water_enabled:
+            db.commit()
+            return
 
-        if decision.should_water:
+        recent = db.query(SensorReading)\
+            .filter_by(plant_id=plant.id)\
+            .order_by(SensorReading.timestamp.desc())\
+            .limit(20).all()
+        moisture_history = [r.moisture_pct for r in reversed(recent)]
+
+        decision = decide(
+            plant.profile_id,
+            moisture,
+            plant.last_watered_at,
+            plant.health_score or 70,
+            moisture_history,
+        )
+
+        threshold = plant.auto_water_threshold if plant.auto_water_threshold is not None else 0.15
+        if decision.should_water and decision.final_score >= threshold:
+            # 用户自定义时长优先，否则用决策引擎计算值
+            duration_sec = plant.custom_duration_seconds or decision.duration_seconds
             # 发送MQTT浇水指令
             cmd = json.dumps({
                 "command": "water",
-                "duration_ms": decision.duration_seconds * 1000,
+                "duration_ms": duration_sec * 1000,
                 "reason": decision.reason,
                 "plant_id": plant.id,
             })
             client.publish(f"plant/{device_id}/pump/cmd", cmd, qos=0)
-            print(f"[ENGINE] 触发浇水: {plant.nickname} {decision.duration_seconds}s ({decision.reason})")
+            print(f"[ENGINE] 触发浇水: {plant.nickname} {duration_sec}s ({decision.reason})")
 
+            factors_json = json.dumps(
+                [{"name": f.name, "key": f.key, "score": f.score, "level": f.level, "detail": f.detail}
+                 for f in decision.factors],
+                ensure_ascii=False,
+            )
             # 记录浇水事件
             event = WateringEvent(
                 plant_id=plant.id,
                 device_id=device_id,
-                duration_seconds=decision.duration_seconds,
+                duration_seconds=duration_sec,
                 trigger_type="threshold",
                 moisture_before=moisture,
                 reason=decision.reason,
+                decision_factors=factors_json,
+                final_score=decision.final_score,
             )
             db.add(event)
             plant.last_watered_at = datetime.utcnow()
