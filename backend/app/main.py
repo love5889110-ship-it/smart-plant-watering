@@ -155,6 +155,14 @@ def get_plant_detail(plant_id: int, db: Session = Depends(get_db)):
         "thresholds": thresholds,
         "health_score": health,
         "last_watered_at": plant.last_watered_at,
+        "settings": {
+            "auto_water_enabled": plant.auto_water_enabled if plant.auto_water_enabled is not None else True,
+            "auto_water_threshold": plant.auto_water_threshold if plant.auto_water_threshold is not None else 0.15,
+            "custom_duration_seconds": plant.custom_duration_seconds,
+            "custom_min_interval_hours": plant.custom_min_interval_hours,
+            "default_min_interval_hours": profile["watering"]["min_interval_hours"] if profile else 1,
+            "default_duration_seconds": profile["watering"]["base_duration_seconds"] if profile else 10,
+        },
         "readings": [{"t": r.timestamp, "m": r.moisture_pct} for r in readings],
         "watering_events": care_events,
         "decision": decision_data,
@@ -166,6 +174,12 @@ def get_plant_detail(plant_id: int, db: Session = Depends(get_db)):
 # ============================================================
 class WaterCommand(BaseModel):
     duration_seconds: int = 10
+
+class PlantSettings(BaseModel):
+    auto_water_enabled: bool | None = None
+    auto_water_threshold: float | None = None   # 0.0 ~ 1.0
+    custom_duration_seconds: int | None = None  # 3~30，None=自动计算
+    custom_min_interval_hours: int | None = None  # None=用植物默认值
 
 @app.post("/api/plants/{plant_id}/water")
 def manual_water(plant_id: int, body: WaterCommand, db: Session = Depends(get_db)):
@@ -205,6 +219,33 @@ def manual_water(plant_id: int, body: WaterCommand, db: Session = Depends(get_db
     plant.last_watered_at = datetime.utcnow()
     db.commit()
     return {"message": f"已发送浇水指令: {body.duration_seconds}秒"}
+
+
+# ============================================================
+# 植物设置
+# ============================================================
+@app.patch("/api/plants/{plant_id}/settings")
+def update_settings(plant_id: int, body: PlantSettings, db: Session = Depends(get_db)):
+    plant = db.query(PlantInstance).get(plant_id)
+    if not plant:
+        raise HTTPException(404, "植物不存在")
+    if body.auto_water_enabled is not None:
+        plant.auto_water_enabled = body.auto_water_enabled
+    if body.auto_water_threshold is not None:
+        plant.auto_water_threshold = max(0.0, min(1.0, body.auto_water_threshold))
+    if body.custom_duration_seconds is not None:
+        plant.custom_duration_seconds = max(3, min(30, body.custom_duration_seconds))
+    if body.custom_min_interval_hours is not None:
+        plant.custom_min_interval_hours = max(0, body.custom_min_interval_hours)
+    db.commit()
+    profile = get_profile(plant.profile_id)
+    return {
+        "auto_water_enabled": plant.auto_water_enabled,
+        "auto_water_threshold": plant.auto_water_threshold,
+        "custom_duration_seconds": plant.custom_duration_seconds,
+        "custom_min_interval_hours": plant.custom_min_interval_hours,
+        "default_min_interval_hours": profile["watering"]["min_interval_hours"] if profile else 1,
+    }
 
 
 # ============================================================

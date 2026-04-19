@@ -154,43 +154,157 @@
           <div class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <span>⚙️</span> 智能设置
           </div>
-          <div class="flex items-center justify-between mb-4">
+
+          <!-- 自动浇水开关 -->
+          <div class="flex items-center justify-between py-3 border-b border-gray-100">
             <div>
               <div class="text-sm font-medium text-gray-700">自动浇水</div>
-              <div class="text-xs text-gray-500">多因子综合评分 ≥ 0.15 自动触发</div>
+              <div class="text-xs text-gray-400">综合评分超过阈值时自动执行</div>
             </div>
-            <button @click="autoWater = !autoWater"
+            <button @click="toggleAutoWater"
                     class="relative w-12 h-6 rounded-full transition-all duration-300"
-                    :class="autoWater ? 'bg-green-500' : 'bg-gray-200'">
+                    :class="settings.auto_water_enabled ? 'bg-green-500' : 'bg-gray-200'">
               <div class="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300"
-                   :class="autoWater ? 'left-6' : 'left-0.5'"></div>
+                   :class="settings.auto_water_enabled ? 'left-6' : 'left-0.5'"></div>
             </button>
           </div>
-          <div class="bg-gray-50 rounded-2xl p-4">
-            <div class="text-sm font-medium text-gray-700 mb-3">
-              {{ seasonEmoji }} {{ seasonName }}养护参数
-              <span class="text-xs text-gray-500 ml-1">（季节系数 ×{{ plant.thresholds.multiplier }}）</span>
+
+          <!-- 自动浇水细项设置 -->
+          <div v-if="settings.auto_water_enabled" class="space-y-5 mt-4 pb-4 border-b border-gray-100">
+            <!-- 触发灵敏度 -->
+            <div>
+              <div class="flex justify-between items-center mb-2">
+                <div>
+                  <div class="text-sm font-medium text-gray-700">触发灵敏度</div>
+                  <div class="text-xs text-gray-400">综合评分超过此值自动浇水</div>
+                </div>
+                <span class="text-sm font-bold text-blue-600">{{ Math.round(settings.auto_water_threshold * 100) }}分</span>
+              </div>
+              <input type="range" min="5" max="80" step="5"
+                     :value="Math.round(settings.auto_water_threshold * 100)"
+                     @change="updateSetting('auto_water_threshold', $event.target.value / 100)"
+                     class="w-full accent-blue-500" />
+              <div class="flex justify-between text-xs text-gray-400 mt-1">
+                <span>5（最灵敏）</span><span>80（最保守）</span>
+              </div>
             </div>
-            <div class="grid grid-cols-2 gap-2">
-              <div class="bg-white rounded-xl p-2.5">
-                <div class="text-xs text-red-500 mb-0.5">紧急补水</div>
-                <div class="text-sm font-semibold text-gray-700">湿度 &lt; {{ plant.thresholds.critical_low }}%</div>
+
+            <!-- 单次浇水时长 -->
+            <div>
+              <div class="flex justify-between items-center mb-2">
+                <div>
+                  <div class="text-sm font-medium text-gray-700">单次浇水时长</div>
+                  <div class="text-xs text-gray-400">
+                    {{ settings.custom_duration_seconds ? '自定义' : `由决策引擎自动计算（植物基准 ${settings.default_duration_seconds}秒）` }}
+                  </div>
+                </div>
+                <span class="text-sm font-bold text-blue-600">{{ settings.custom_duration_seconds ? settings.custom_duration_seconds + '秒' : '自动' }}</span>
               </div>
-              <div class="bg-white rounded-xl p-2.5">
-                <div class="text-xs text-yellow-600 mb-0.5">建议浇水</div>
-                <div class="text-sm font-semibold text-gray-700">湿度 &lt; {{ plant.thresholds.target_low }}%</div>
+              <div class="flex gap-2 flex-wrap">
+                <button @click="updateSetting('custom_duration_seconds', null)"
+                        class="text-xs px-3 py-1.5 rounded-xl transition-all"
+                        :class="!settings.custom_duration_seconds ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'">自动</button>
+                <button v-for="sec in [5,8,10,15,20,30]" :key="sec"
+                        @click="updateSetting('custom_duration_seconds', sec)"
+                        class="text-xs px-3 py-1.5 rounded-xl transition-all"
+                        :class="settings.custom_duration_seconds === sec ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'">{{ sec }}s</button>
               </div>
-              <div class="bg-white rounded-xl p-2.5">
-                <div class="text-xs text-green-600 mb-0.5">适宜范围</div>
-                <div class="text-sm font-semibold text-gray-700">{{ plant.thresholds.target_low }}~{{ plant.thresholds.target_high }}%</div>
+            </div>
+
+            <!-- 最短间隔 -->
+            <div>
+              <div class="flex justify-between items-center mb-2">
+                <div>
+                  <div class="text-sm font-medium text-gray-700">最短浇水间隔</div>
+                  <div class="text-xs text-gray-400">{{ settings.custom_min_interval_hours != null ? '自定义' : `植物特性默认 ${settings.default_min_interval_hours}小时` }}</div>
+                </div>
+                <span class="text-sm font-bold text-blue-600">{{ settings.custom_min_interval_hours != null ? settings.custom_min_interval_hours + '小时' : '默认' }}</span>
               </div>
-              <div class="bg-white rounded-xl p-2.5">
-                <div class="text-xs text-blue-500 mb-0.5">停止浇水</div>
-                <div class="text-sm font-semibold text-gray-700">湿度 &gt; {{ plant.thresholds.critical_high }}%</div>
+              <div class="flex gap-2 flex-wrap">
+                <button @click="updateSetting('custom_min_interval_hours', null)"
+                        class="text-xs px-3 py-1.5 rounded-xl transition-all"
+                        :class="settings.custom_min_interval_hours == null ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'">默认</button>
+                <button v-for="h in [1,2,4,6,12,24]" :key="h"
+                        @click="updateSetting('custom_min_interval_hours', h)"
+                        class="text-xs px-3 py-1.5 rounded-xl transition-all"
+                        :class="settings.custom_min_interval_hours === h ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'">{{ h }}h</button>
               </div>
+            </div>
+          </div>
+
+          <!-- 植物特性 -->
+          <div class="mt-4 pb-4 border-b border-gray-100">
+            <div class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              <span>{{ plant.profile?.emoji }}</span> {{ plant.profile?.name_zh }} 养护特性
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-3">
+              <div class="bg-gray-50 rounded-xl p-3">
+                <div class="text-xs text-gray-400 mb-1">浇水策略</div>
+                <div class="text-sm font-semibold text-gray-700">{{ strategyLabel }}</div>
+              </div>
+              <div class="bg-gray-50 rounded-xl p-3">
+                <div class="text-xs text-gray-400 mb-1">干旱敏感度</div>
+                <div class="text-sm font-semibold" :class="sensitivityColor(plant.profile?.sensitivity?.drought)">
+                  {{ sensitivityLabel(plant.profile?.sensitivity?.drought) }}
+                </div>
+              </div>
+              <div class="bg-gray-50 rounded-xl p-3">
+                <div class="text-xs text-gray-400 mb-1">积水敏感度</div>
+                <div class="text-sm font-semibold" :class="sensitivityColor(plant.profile?.sensitivity?.overwater)">
+                  {{ sensitivityLabel(plant.profile?.sensitivity?.overwater) }}
+                </div>
+              </div>
+              <div class="bg-gray-50 rounded-xl p-3">
+                <div class="text-xs text-gray-400 mb-1">默认浇水间隔</div>
+                <div class="text-sm font-semibold text-gray-700">{{ settings.default_min_interval_hours }} 小时</div>
+              </div>
+            </div>
+            <!-- 适宜湿度区间 -->
+            <div class="bg-gray-50 rounded-xl p-3">
+              <div class="text-xs text-gray-400 mb-2">湿度阈值（当前季节调整后）</div>
+              <div class="flex items-center gap-1 text-xs">
+                <span class="text-red-500 font-medium">危 {{ plant.thresholds.critical_low }}%</span>
+                <div class="flex-1 h-3 bg-gray-200 rounded-full relative mx-1 overflow-hidden">
+                  <div class="absolute inset-y-0 bg-orange-200 rounded-full"
+                       :style="{ left: plant.thresholds.critical_low + '%', width: (plant.thresholds.target_low - plant.thresholds.critical_low) + '%' }"></div>
+                  <div class="absolute inset-y-0 bg-green-300 rounded-full"
+                       :style="{ left: plant.thresholds.target_low + '%', width: (plant.thresholds.target_high - plant.thresholds.target_low) + '%' }"></div>
+                  <div class="absolute inset-y-0 bg-blue-200 rounded-full"
+                       :style="{ left: plant.thresholds.target_high + '%', width: (plant.thresholds.critical_high - plant.thresholds.target_high) + '%' }"></div>
+                </div>
+                <span class="text-blue-500 font-medium">危 {{ plant.thresholds.critical_high }}%</span>
+              </div>
+              <div class="flex justify-between text-xs text-gray-400 mt-1 px-1">
+                <span>建议 &lt;{{ plant.thresholds.target_low }}%</span>
+                <span class="text-green-600 font-medium">适宜 {{ plant.thresholds.target_low }}~{{ plant.thresholds.target_high }}%</span>
+                <span>过湿 &gt;{{ plant.thresholds.target_high }}%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 季节需水系数 -->
+          <div class="mt-4">
+            <div class="text-sm font-semibold text-gray-700 mb-3">四季需水系数</div>
+            <div class="grid grid-cols-4 gap-2">
+              <div v-for="(item, idx) in seasonMultipliers" :key="idx"
+                   class="rounded-xl p-2.5 text-center border-2 transition-all"
+                   :class="item.current ? 'border-green-400 bg-green-50' : 'border-transparent bg-gray-50'">
+                <div class="text-lg">{{ item.emoji }}</div>
+                <div class="text-xs text-gray-500 mt-0.5">{{ item.name }}</div>
+                <div class="text-sm font-bold mt-1" :class="item.current ? 'text-green-600' : 'text-gray-600'">×{{ item.mult }}</div>
+                <div class="text-xs mt-0.5" :class="item.mult >= 1.3 ? 'text-orange-500' : item.mult <= 0.4 ? 'text-blue-400' : 'text-gray-400'">
+                  {{ item.mult >= 1.3 ? '需水旺' : item.mult <= 0.4 ? '休眠省' : item.mult <= 0.7 ? '适度减' : '正常' }}
+                </div>
+                <div v-if="item.current" class="text-xs text-green-600 font-medium mt-0.5">当前</div>
+              </div>
+            </div>
+            <div class="mt-3 text-xs text-gray-400 bg-gray-50 rounded-xl p-3 leading-relaxed">
+              💡 季节系数会调整目标湿度区间宽窄，系数越大目标湿度越高，浇水更频繁。不影响紧急安全阈值。
             </div>
           </div>
         </div>
+
+
 
         <!-- 湿度趋势 -->
         <div class="bg-white rounded-3xl shadow-sm p-5">
@@ -277,7 +391,14 @@ const plant = ref(null)
 const loading = ref(true)
 const watering = ref(false)
 const waterDuration = ref(5)
-const autoWater = ref(true)
+const settings = ref({
+  auto_water_enabled: true,
+  auto_water_threshold: 0.15,
+  custom_duration_seconds: null,
+  custom_min_interval_hours: null,
+  default_min_interval_hours: 1,
+  default_duration_seconds: 10,
+})
 
 const timeOfDay = getTimeOfDay()
 const season = getSeason()
@@ -398,6 +519,7 @@ async function load() {
       else status = 'ok'
     }
     plant.value = { ...data, status }
+    if (data.settings) settings.value = data.settings
   } finally {
     loading.value = false
   }
@@ -424,6 +546,48 @@ function formatTime(t) {
 
 function reasonLabel(r) {
   return { manual:'手动浇水', threshold:'自动浇水', critical_dry:'紧急补水', schedule:'定时浇水', moisture_low:'湿度偏低' }[r] ?? (r || '浇水')
+}
+
+// 植物特性辅助
+const strategyLabel = computed(() => ({
+  'keep_moist': '保湿型',
+  'dry_between': '干透浇透',
+  'dry_then_water': '干透浇透',
+  'standard': '标准型',
+})[plant.value?.profile?.watering?.strategy] ?? '标准型')
+
+function sensitivityLabel(level) {
+  return { very_high: '非常高', high: '极高', medium: '中等', low: '偏低' }[level] ?? level ?? '--'
+}
+function sensitivityColor(level) {
+  return { very_high: 'text-red-600', high: 'text-red-500', medium: 'text-orange-400', low: 'text-green-500' }[level] ?? 'text-gray-500'
+}
+
+const SEASON_META = {
+  spring: { emoji: '🌸', name: '春' },
+  summer: { emoji: '☀️', name: '夏' },
+  autumn: { emoji: '🍂', name: '秋' },
+  winter: { emoji: '❄️', name: '冬' },
+}
+const seasonMultipliers = computed(() => {
+  const mults = plant.value?.profile?.seasonal_multipliers ?? {}
+  return ['spring','summer','autumn','winter'].map(s => ({
+    emoji: SEASON_META[s].emoji,
+    name: SEASON_META[s].name,
+    mult: mults[s] ?? 1.0,
+    current: s === season,
+  }))
+})
+
+async function toggleAutoWater() {
+  const val = !settings.value.auto_water_enabled
+  settings.value.auto_water_enabled = val
+  await axios.patch(`/api/plants/${route.params.id}/settings`, { auto_water_enabled: val })
+}
+
+async function updateSetting(key, value) {
+  settings.value[key] = value
+  await axios.patch(`/api/plants/${route.params.id}/settings`, { [key]: value })
 }
 
 onMounted(load)

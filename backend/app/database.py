@@ -17,6 +17,11 @@ class PlantInstance(Base):
     device_id = Column(String, nullable=False)    # esp32_plant_01
     health_score = Column(Integer, default=100)
     last_watered_at = Column(DateTime, nullable=True)
+    # 自动浇水设置
+    auto_water_enabled = Column(Boolean, default=True)
+    auto_water_threshold = Column(Float, default=0.15)   # 触发评分阈值
+    custom_duration_seconds = Column(Integer, nullable=True)  # None=由决策引擎计算
+    custom_min_interval_hours = Column(Integer, nullable=True) # None=用植物档案默认值
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class SensorReading(Base):
